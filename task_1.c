@@ -1,39 +1,39 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
+#include <string.h>
 #include <sys/wait.h>
 
-#define MAX_COMMAND_LENGTH 100
+#define BUFFER_SIZE 1024
 
-int main() {
-    char command[MAX_COMMAND_LENGTH];
+int main(int argc, char **argv)
+{
+    char buffer[BUFFER_SIZE];
+    char *args[100];
+    int status;
 
     while (1) {
-        printf("$ ");  // Display the prompt
-        if (fgets(command, sizeof(command), stdin) == NULL) {
-            printf("\n");
-            break;  // Handle "end of file" condition (Ctrl+D)
+        printf("$ ");
+        fgets(buffer, BUFFER_SIZE, stdin);
+        buffer[strlen(buffer) - 1] = '\0';
+
+        char *token = strtok(buffer, " ");
+        int i = 0;
+        while (token != NULL) {
+            args[i++] = token;
+            token = strtok(NULL, " ");
         }
-        command[strcspn(command, "\n")] = 0;  // Remove the newline character
+        args[i] = NULL;
 
         pid_t pid = fork();
-        if (pid < 0) {
-            perror("fork failed");
-            exit(1);
-        } else if (pid == 0) {
-            // Child process
-            execlp(command, command, (char *)NULL);  // Execute the command
-            perror("exec failed");
-            exit(1);
+        if (pid == 0) {
+            execvp(args[0], args);
+            printf("Command not found\n");
+            exit(0);
         } else {
-            // Parent process
-            int status;
-            waitpid(pid, &status, 0);  // Wait for the child process to finish
+            wait(&status);
         }
     }
 
     return 0;
 }
-
