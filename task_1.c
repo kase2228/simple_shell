@@ -1,38 +1,66 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
-#include <sys/wait.h>
+#include <unistd.h>
 
-#define BUFFER_SIZE 1024
+#define MAX_COMMAND_LENGTH 100
 
-int main(int argc, char **argv)
+/**
+ * execute_command - executes the given command
+ * @command: the command to execute
+ */
+void execute_command(char *command)
 {
-    char buffer[BUFFER_SIZE];
-    char *args[100];
-    int status;
+    char *arguments[MAX_COMMAND_LENGTH / 2 + 1];
+    char *token;
+    int i = 0;
+
+    // Tokenize the command string
+    token = strtok(command, " ");
+    while (token != NULL && i < MAX_COMMAND_LENGTH / 2) {
+        arguments[i] = token;
+        token = strtok(NULL, " ");
+        i++;
+    }
+    arguments[i] = NULL;
+
+    // Check if the command exists in the PATH
+    if (access(arguments[0], X_OK) == 0) {
+        // Fork a child process
+        pid_t pid = fork();
+        if (pid == -1) {
+            perror("fork");
+            exit(EXIT_FAILURE);
+        } else if (pid == 0) { // Child process
+            execve(arguments[0], arguments, NULL);
+            perror("execve");
+            exit(EXIT_FAILURE);
+        } else { // Parent process
+            wait(NULL);
+        }
+    } else {
+        printf("Command not found: %s\n", arguments[0]);
+    }
+}
+
+/**
+ * main - entry point
+ * Return: 0 on success, otherwise 1
+ */
+int main(void)
+{
+    char command[MAX_COMMAND_LENGTH];
 
     while (1) {
         printf("$ ");
-        fgets(buffer, BUFFER_SIZE, stdin);
-        buffer[strlen(buffer) - 1] = '\0';
+        fgets(command, MAX_COMMAND_LENGTH, stdin);
+        command[strcspn(command, "\n")] = '\0'; // Remove the trailing newline
 
-        char *token = strtok(buffer, " ");
-        int i = 0;
-        while (token != NULL) {
-            args[i++] = token;
-            token = strtok(NULL, " ");
+        if (strcmp(command, "exit") == 0) {
+            break;
         }
-        args[i] = NULL;
 
-        pid_t pid = fork();
-        if (pid == 0) {
-            execvp(args[0], args);
-            printf("Command not found\n");
-            exit(0);
-        } else {
-            wait(&status);
-        }
+        execute_command(command);
     }
 
     return 0;
